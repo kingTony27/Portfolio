@@ -1,26 +1,561 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  /* ink-on-paper palette */
+  --background: #f5f2ea;
   --foreground: #171717;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Make Tailwind's font-sans (and anything inherited) use Sancreek */
+  --font-sans: var(--font-sancreek);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Sancreek everywhere by default */
+  font-family: var(--font-sancreek), cursive;
 }
+
+/* Form controls do not inherit fonts by default — force them to match */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* ---- Home page: spray-paint headline + hand-written hint ---------------------
+   Plain HTML sitting over the 3D board. The size is a single clamp, so the
+   headline shrinks smoothly all the way down to phones (2.2rem floor) and stops
+   at 6.5rem on a wide screen. Each letter is its own <span> (see
+   components/WelcomeHeadline.tsx) with an animation-delay, which is the whole
+   "sprayed on letter by letter" effect. */
+
+.home-headline {
+  margin: 0;
+  /* phones start at 2.2rem, 7vw in between, 6.5rem ceiling */
+  font-size: clamp(2.2rem, 7vw, 6.5rem);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: #15130f;
+}
+
+/* the two lines stack, both centred */
+.home-headline-line,
+.home-headline-sub {
+  display: block;
+}
+
+/* "to my portfolio" is 40% of "Welcome" */
+.home-headline-sub {
+  font-size: 40%;
+  letter-spacing: 0.02em;
+}
+
+.home-spray-letter {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  animation: spray-in 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* Letters land slightly oversized and off-angle, then settle — the imprint a
+   spray can leaves. Transform + opacity only, so it stays cheap. */
+@keyframes spray-in {
+  0% {
+    opacity: 0;
+    transform: scale(1.4) rotate(-5deg);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(0.95) rotate(2deg);
+  }
+  70% {
+    opacity: 0.85;
+    transform: scale(1.03) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* the hand-written "pick a note to start" line under the headline */
+.home-hint {
+  margin: 0.6rem 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: clamp(0.8rem, 1.5vw, 1.05rem);
+  letter-spacing: 0.08em;
+  color: #15130f;
+  opacity: 0.85;
+  transition: opacity 0.5s ease;
+}
+/* fades away for good after the first note is clicked */
+.home-hint--gone {
+  opacity: 0;
+}
+.home-hint-arrow {
+  width: 1.6em;
+  height: 1.3em;
+  flex: 0 0 auto;
+}
+
+/* Nothing here is essential motion — show the finished state instead. */
+@media (prefers-reduced-motion: reduce) {
+  .home-spray-letter {
+    animation: none;
+    opacity: 1;
+  }
+  .home-hint {
+    transition: none;
+  }
+}
+
+/* ---- Projects page ----------------------------------------------------------
+   Cards slide up and settle the first time they enter the screen. The
+   `is-visible` class is added by an IntersectionObserver in ProjectCard.tsx. */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Respect the user's motion preference: no sliding, just show the card. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Live and Video demos share these two sizes, so the card NEVER jumps in height
+   when the user switches tabs. The media area is the same 1.91 / 1 ratio X uses
+   for its link cards, and the strip below is a fixed height. */
+.demo-media {
+  aspect-ratio: 1.91 / 1;
+}
+.demo-strip {
+  height: 86px;
+}
+@media (min-width: 768px) {
+  .demo-strip {
+    height: 96px;
+  }
+}
+
+/* ---- Contact page -----------------------------------------------------------
+   The "RECEIVED" ink stamp slams onto the success card: it starts large and
+   tilted, overshoots slightly, then settles. A short, punchy animation. */
+@keyframes stamp-slam {
+  0% {
+    opacity: 0;
+    transform: scale(2.4) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+.received-stamp {
+  animation: stamp-slam 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* No slam for anyone who prefers less motion — just show the stamp tilted. */
+@media (prefers-reduced-motion: reduce) {
+  .received-stamp {
+    animation: none;
+    transform: rotate(-8deg);
+  }
+}
+
+/* ---- Tools page --------------------------------------------------------------
+   Every department headline is followed by one plain row of tool icons. The row
+   is an ordinary wrapping flexbox, so each tool appears exactly ONCE in the
+   page and it re-flows by itself when the screen gets narrow.
+
+   The markup is one <ul class="tool-row"> per department, holding one
+   <li class="tool-item"> per tool (icon on top, name underneath). It is built by
+   components/tools/ToolRow.tsx.
+
+   WHERE TO CHANGE THE LOOK — every knob lives here, in one place
+   --------------------------------------------------------------
+   * ash grey icon colour ......  --tool-ash        (below, starts at #8c8c86)
+   * name colour ...............  --tool-name       (below, starts at #3d3d3a)
+   * icon size .................  --tool-icon-size  (48 / 60 / 72 px)
+   * name size .................  --tool-name-size  (14 / 15 / 16 px)
+   * item width ................  --tool-item-width (104 / 120 / 136 px)
+   * space between the items ...  the `gap` on .tool-row (row-gap, column-gap)
+   * the black "hover ink" .....  the :hover / :focus-within rule below
+   Each size is written three times on purpose — the phone value first, then the
+   md and lg overrides right under it — so a change can be made in one place.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --tool-ash: #8c8c86; /* every tool icon uses this one colour */
+  --tool-name: #3d3d3a; /* the small name under each icon */
+}
+
+/* the list itself: a centred row that wraps when it runs out of room */
+.tool-row {
+  /* mobile-first sizes; md and lg override them below */
+  --tool-icon-size: 48px;
+  --tool-name-size: 14px;
+  --tool-item-width: 104px; /* 3 tools fit side by side at 375px */
+
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  /* row-gap 28px; column-gap 12px on phones so that 3 tools (3x104 + 2 gaps)
+     really do fit side by side at 375px. md widens the columns to 16px. */
+  gap: 28px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none; /* no bullets, even if a reset ever changes */
+}
+@media (min-width: 768px) {
+  .tool-row {
+    --tool-icon-size: 60px;
+    --tool-name-size: 15px;
+    --tool-item-width: 120px;
+    column-gap: 16px;
+  }
+}
+@media (min-width: 1024px) {
+  .tool-row {
+    --tool-icon-size: 72px;
+    --tool-name-size: 16px;
+    --tool-item-width: 136px; /* a row of 5 fits on one line in the page column */
+  }
+}
+
+/* one tool = the icon on top, the name underneath, everything centred */
+.tool-item {
+  flex: 0 0 auto; /* keep the natural width: never stretch, never shrink */
+  width: var(--tool-item-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px; /* the small icon-to-name gap */
+}
+.tool-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tool-icon-size);
+  height: var(--tool-icon-size);
+  color: var(--tool-ash);
+  transition:
+    color 0.22s ease,
+    transform 0.22s ease;
+}
+/* the react-icons <svg> and the CustomIcon <span> both fill this box */
+.tool-icon-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* the name is allowed to wrap onto a second line — it is never cut off */
+.tool-name {
+  font-size: var(--tool-name-size);
+  color: var(--tool-name);
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+
+/* hover or keyboard focus: the icon turns ink black and lifts 2px */
+.tool-item:hover .tool-icon,
+.tool-item:focus-within .tool-icon {
+  color: #15130f;
+  transform: translateY(-2px);
+}
+/* keyboard users get a visible marker, since the lift alone is too subtle */
+.tool-item:focus-visible {
+  outline: none;
+}
+.tool-item:focus-visible .tool-icon {
+  outline: 2px dotted rgba(21, 19, 15, 0.55);
+  outline-offset: 3px;
+}
+
+/* ---- About page ---------------------------------------------------------------
+   The whole letter is plain HTML + CSS (no 3D). The one idea worth knowing: the
+   writing's line-height and the ruled-lines gradient's repeat are the SAME value
+   (--letter-line-height), which is what makes every line of text sit exactly on
+   a rule.
+
+   WHERE TO CHANGE THE LOOK — every knob lives here, in one place
+   --------------------------------------------------------------
+   * sheet width ................  .letter-stage width (92vw / 600px / 680px)
+   * the tilt ...................  .letter-sheet rotate (-1deg; none on phones)
+   * line spacing AND the rules ..  --letter-line-height
+   * writing size ...............  .letter-body font-size (16px / 18px)
+   * side padding ...............  --letter-pad-x
+   * left margin line ...........  --letter-marginline
+   * the fold creases ...........  .letter-fold (top 33.33% / 66.66%)
+   * slide-up on load ...........  .letter-rise animation (+ reduced-motion rule)
+   ---------------------------------------------------------------------------- */
+
+:root {
+  /* ONE value used twice: the writing's line-height AND the vertical repeat of
+     the ruled-lines gradient. Keeping them identical is the whole trick. */
+  --letter-line-height: 1.75rem; /* phones */
+  --letter-pad-x: 2.25rem;
+  --letter-pad-y: 2.75rem;
+  --letter-marginline: 1.5rem; /* where the thin grey line sits */
+  --letter-rule: rgba(21, 19, 15, 0.14); /* the ruled lines */
+}
+@media (min-width: 768px) {
+  :root {
+    --letter-line-height: 2rem;
+    --letter-pad-x: 3rem;
+    --letter-pad-y: 3.25rem;
+    --letter-marginline: 2rem;
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --letter-pad-x: 3.5rem;
+    --letter-pad-y: 3.75rem;
+    --letter-marginline: 2.5rem;
+  }
+}
+
+/* the centred stage — its width IS the sheet width */
+.letter-stage {
+  position: relative;
+  margin-inline: auto;
+  width: 92vw;
+  max-width: 100%; /* never wider than the column, so phones never scroll sideways */
+}
+@media (min-width: 768px) {
+  .letter-stage {
+    width: 600px;
+  }
+}
+@media (min-width: 1024px) {
+  .letter-stage {
+    width: 680px;
+  }
+}
+
+/* the slide-up when the page loads. Transform + opacity only (cheap to animate) */
+@keyframes letter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(38px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.letter-rise {
+  position: relative;
+  z-index: 10; /* above the envelope that peeks out behind it */
+  animation: letter-rise 0.75s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .letter-rise {
+    animation: none;
+  }
+}
+
+/* The soft shadow sits on a WRAPPER, not on the sheet: the sheet is clipped to a
+   rough edge, and clip-path would cut a normal box-shadow straight off. A filter
+   on the parent is applied to the already-clipped shape, so the shadow follows
+   the rough edge. */
+.letter-shadow {
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.28))
+    drop-shadow(0 3px 5px rgba(0, 0, 0, 0.18));
+}
+
+/* the paper itself */
+.letter-sheet {
+  position: relative;
+  background-color: #f4efe2;
+  background-image: url("/images/paper_bg.webp");
+  background-size: cover;
+  background-position: center;
+  padding: var(--letter-pad-y) var(--letter-pad-x);
+  /* "Slightly rough" edges: a jagged clip-path that only shaves ~2-3px off, so
+     the paper looks hand-torn without eating into the writing. */
+  clip-path: polygon(
+    0.4% 0.5%, 7% 0.15%, 14% 0.5%, 21% 0.1%, 29% 0.55%, 37% 0.15%,
+    45% 0.5%, 53% 0.1%, 61% 0.6%, 69% 0.2%, 77% 0.5%, 85% 0.1%,
+    93% 0.55%, 99.5% 0.2%,
+    99.85% 8%, 99.45% 17%, 99.9% 26%, 99.5% 36%, 100% 46%, 99.5% 56%,
+    99.9% 66%, 99.45% 76%, 99.85% 86%, 99.5% 94%,
+    99.6% 99.4%,
+    93% 99.9%, 85% 99.5%, 77% 99.9%, 69% 99.5%, 61% 99.85%, 53% 99.5%,
+    45% 99.9%, 37% 99.5%, 29% 99.85%, 21% 99.5%, 14% 99.9%, 7% 99.5%,
+    0.5% 99.85%,
+    0.15% 94%, 0.55% 86%, 0.2% 76%, 0.6% 66%, 0.15% 56%, 0.55% 46%,
+    0.1% 36%, 0.5% 26%, 0.15% 17%, 0.45% 8%
+  );
+}
+@media (min-width: 768px) {
+  /* a very slight tilt, like a letter laid down by hand. Phones stay straight so
+     the text is never harder to read than it needs to be. */
+  .letter-sheet {
+    rotate: -1deg;
+  }
+}
+
+/* thin grey vertical margin line down the left */
+.letter-marginline {
+  position: absolute;
+  left: var(--letter-marginline);
+  top: var(--letter-pad-y);
+  bottom: var(--letter-pad-y);
+  width: 1px;
+  background: rgba(21, 19, 15, 0.22);
+}
+
+/* a fold crease: a thin darker line with a soft light-and-shadow either side */
+.letter-fold {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(21, 19, 15, 0) 0%,
+    rgba(21, 19, 15, 0.05) 44%,
+    rgba(21, 19, 15, 0.11) 50%,
+    rgba(255, 255, 255, 0.5) 57%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* the writing, sitting on the ruled lines */
+.letter-body {
+  position: relative;
+  z-index: 2;
+  font-size: 1rem; /* 16px on phones */
+  line-height: var(--letter-line-height);
+  color: #2a2620; /* dark ink */
+  /* faint ruled lines: one hairline at the bottom of every line-height band. The
+     repeat height is the same variable as the line-height above, so the rules
+     and the writing can never drift apart. */
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(100% - 1px),
+    var(--letter-rule) calc(100% - 1px)
+  );
+  background-size: 100% var(--letter-line-height);
+  background-repeat: repeat-y;
+}
+@media (min-width: 1024px) {
+  .letter-body {
+    font-size: 1.125rem; /* 18px */
+  }
+}
+/* every gap is a whole line-height, so the text never slips off the rules */
+.letter-body p {
+  margin: 0 0 var(--letter-line-height);
+}
+.letter-body p:last-child {
+  margin-bottom: 0;
+}
+.letter-signature {
+  font-size: 1.35em;
+}
+
+/* the round ink "wax" seal, with the initial inside it */
+.letter-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  margin-top: var(--letter-line-height);
+  color: #f2ece0;
+  font-size: 1.8rem;
+  line-height: 1;
+  /* a slightly irregular circle, so it reads as pressed wax rather than a dot */
+  border-radius: 47% 53% 50% 50% / 52% 48% 53% 47%;
+  background:
+    radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 46%),
+    radial-gradient(circle at 50% 50%, #2c2823 0%, #15130f 70%, #0c0b09 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.09),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* a strip of tape stuck over one corner */
+.letter-tape {
+  position: absolute;
+  top: -0.6rem;
+  left: -1.75rem;
+  width: 5.5rem;
+  height: 1.6rem;
+  pointer-events: none;
+  rotate: -16deg;
+  opacity: 0.6;
+}
+
+/* the round postmark with the year, top right */
+.letter-postmark {
+  position: absolute;
+  top: calc(var(--letter-pad-y) - 1.4rem);
+  right: calc(var(--letter-pad-x) - 0.5rem);
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+  rotate: -11deg;
+  opacity: 0.85;
+}
+.letter-postmark-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 2.5px solid rgba(21, 19, 15, 0.5);
+  border-radius: 50%;
+  /* a ring of paper then a second, thinner ring: the classic postmark look */
+  box-shadow:
+    inset 0 0 0 5px rgba(244, 239, 226, 0.9),
+    inset 0 0 0 7px rgba(21, 19, 15, 0.28);
+  color: rgba(21, 19, 15, 0.6);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+}
+
+/* a plain envelope tucked behind the sheet, only its top peeking out below */
+.letter-envelope {
+  position: absolute;
+  z-index: 0;
+  top: 100%;
+  left: 50%;
+  width: 74%;
+  max-width: 520px;
+  height: 90px;
+  margin-top: -16px; /* hides the envelope's top edge behind the sheet */
+  transform: translateX(-50%);
+  opacity: 0.45;
+}
+
+

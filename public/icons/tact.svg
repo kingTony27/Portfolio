@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#000">
+  <!-- PLACEHOLDER - replace with the official logo -->
+  <!-- Tact is not in the Simple Icons set (react-icons@5). This is a simple
+       stand-in (a bold "T"). Only the shape matters: CustomIcon uses this file
+       as a CSS mask, so the colour above is ignored. -->
+  <path d="M3.4 3.4h17.2v4.2h-6.5V20.6h-4.2V7.6H3.4V3.4Z" />
+</svg>
