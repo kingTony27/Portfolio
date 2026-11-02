@@ -16,17 +16,7 @@ export type Project = {
 // NOTE: the /videos/*.mp4 files are intentionally NOT created yet.
 // VideoPreview shows a "Video coming soon" paper tile when they are missing.
 export const projects: Project[] = [
-  {
-    id: "project-one",
-    title: "Turtle Meta Tribe",
-    description: "A web3 ecosystem where you can claim daily airdrops, mint NFT's and grind the leaderboard.",
-    tags: ["Next.js", "TypeScript", "Solidity", "Supabase"],
-    liveUrl: "https://turtle-meta-tribe.vercel.app/",
-    previewImage: "/previews/Preview1.png",
-    videoSrc: "/live_demo/TMT live demo(fiverr).mp4",
-    videoPoster: "/previews/poster-1.svg",
-    videoLength: "1:24",
-  },
+
   {
     id: "project-two",
     title: "NFT Marketplace",
@@ -35,7 +25,19 @@ export const projects: Project[] = [
     liveUrl: "https://marketplace-frontend-ivory-six.vercel.app/",
     previewImage: "/previews/Preview2.png",
     videoSrc: "/live_demo/buying_video.mp4",
-    videoPoster: "/previews/poster-2.svg",
+    videoPoster: "/previews/poster-1.svg",
     videoLength: "2:07",
+  },
+
+    {
+    id: "project-one",
+    title: "Turtle Meta Tribe",
+    description: "A web3 ecosystem where you can claim daily airdrops, mint NFT's and grind the leaderboard.",
+    tags: ["Next.js", "TypeScript", "Solidity", "Supabase"],
+    liveUrl: "https://turtle-meta-tribe.vercel.app/",
+    previewImage: "/previews/Preview1.png",
+    videoSrc: "/live_demo/TMT live demo(fiverr).mp4",
+    videoPoster: "/previews/poster-2.svg",
+    videoLength: "1:24",
   },
 ];
