@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useId, useRef } from "react";
 
 // ---- WelcomeHeadline ------------------------------------------------------------
 // The big spray-painted "Welcome / to my portfolio" plus the hand-written hint.
@@ -94,12 +94,23 @@ const BUILT = LINES.map((line, lineIndex) => {
 type WelcomeHeadlineProps = {
   hintVisible: boolean; // false after the first note click -> the hint fades out
   onSprayDone: () => void; // called once the last letter has landed
+  // "overlay" hangs the headline over the 3D board (desktop). "inline" drops the
+  // same headline into the normal page flow (mobile zigzag layout).
+  variant?: "overlay" | "inline";
 };
 
-export default function WelcomeHeadline({ hintVisible, onSprayDone }: WelcomeHeadlineProps) {
+export default function WelcomeHeadline({
+  hintVisible,
+  onSprayDone,
+  variant = "overlay",
+}: WelcomeHeadlineProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<SVGPathElement>(null);
+
+  // Award each instance its own filter id. The desktop board and the mobile
+  // layout can both be mounted at once, so a fixed id would collide.
+  const filterId = `spray-rough-${useId().replace(/[:]/g, "")}`;
 
   // Always call the newest onSprayDone without restarting the animation.
   const doneRef = useRef(onSprayDone);
@@ -188,14 +199,18 @@ export default function WelcomeHeadline({ hintVisible, onSprayDone }: WelcomeHea
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 z-10 flex select-none flex-col items-center px-4 text-center"
-      style={{ top: HEADLINE_TOP }}
+      className={
+        variant === "overlay"
+          ? "pointer-events-none absolute inset-x-0 z-10 flex select-none flex-col items-center px-4 text-center"
+          : "pointer-events-none relative z-10 flex w-full select-none flex-col items-center px-4 text-center"
+      }
+      style={variant === "overlay" ? { top: HEADLINE_TOP } : undefined}
     >
       {/* The rough "spray" edge filter. The region is tall so the drips are not clipped. */}
       <svg aria-hidden="true" width="0" height="0" className="absolute">
         <defs>
           <filter
-            id="spray-rough"
+            id={filterId}
             x="-10%"
             y="-20%"
             width="120%"
@@ -212,7 +227,7 @@ export default function WelcomeHeadline({ hintVisible, onSprayDone }: WelcomeHea
         ref={titleRef}
         aria-label="Welcome to my portfolio"
         className="leading-[1.05] text-[#15130f]"
-        style={ROUGH_EDGES ? { filter: "url(#spray-rough)" } : undefined}
+        style={ROUGH_EDGES ? { filter: `url(#${filterId})` } : undefined}
       >
         {BUILT.map((line, lineIndex) => (
           <span key={line.text} aria-hidden="true" className="block" style={{ fontSize: line.fontSize }}>

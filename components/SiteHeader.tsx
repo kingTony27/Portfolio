@@ -1,8 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CssPin from "./CssPin";
+
+// Temporary timing log: this header mounts on each inner page, so it marks the
+// exact moment the destination page is actually on screen. The tap timestamp is
+// shared from the Home note tap through sessionStorage (key `nav:t0`), so the ms
+// below is measured FROM THE TAP — matching the `[nav]` logs in
+// components/MobileHome.tsx. Set to false to silence it.
+const NAV_DEBUG = true;
+// Must match NAV_T0_KEY in components/MobileHome.tsx.
+const NAV_T0_KEY = "nav:t0";
 
 // ---- Site header -------------------------------------------------------------
 // Sticky bar with a paper background, an ink rule underneath, small tick marks
@@ -111,6 +121,16 @@ function NoteLink({
 
 export default function SiteHeader() {
   const pathname = usePathname();
+
+  // Marks the moment this page is on screen, measured from the note tap on Home
+  // (the tap time travelled here through sessionStorage). If there is no tap
+  // time (e.g. a direct visit), fall back to 0 so the line still prints.
+  useEffect(() => {
+    if (!NAV_DEBUG) return;
+    const t0 = Number(sessionStorage.getItem(NAV_T0_KEY) ?? 0);
+    const ms = t0 > 0 ? Math.round(performance.now() - t0) : 0;
+    console.log(`[nav] page ready ${pathname} (t=${ms}ms)`);
+  }, [pathname]);
 
   // Find the next page in the order. If the path is unknown, -1 + 1 wraps to 0.
   const index = ORDER.findIndex((p) => p.href === pathname);

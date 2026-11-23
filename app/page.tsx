@@ -1,28 +1,59 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Canvas } from "@react-three/fiber";
-import Scene, { type NoteId } from "@/components/Scene";
-import HeaderFooter from "@/components/HeaderFooter";
-import WelcomeHeadline from "@/components/WelcomeHeadline";
+import dynamic from "next/dynamic";
+import type { NoteId } from "@/components/Scene";
+import MobileHome from "@/components/MobileHome";
+
+// ---- The desktop 3D board, loaded on the client and ONLY on desktop ------------
+// `ssr: false` + next/dynamic means this module (and everything it pulls in:
+// three.js, @react-three/fiber, the whole Scene) is never rendered on the server
+// and is only fetched when Home actually mounts it — i.e. on a wide screen. On a
+// phone the import is never triggered, so the 3D code is never downloaded.
+const HomeBoard = dynamic(() => import("@/components/HomeBoard"), { ssr: false });
+
+// Desktop = exactly the same breakpoint the CSS uses for `md`.
+const DESKTOP_QUERY = "(min-width: 768px)";
+
+// Subscribed to the media query; a module-scope function so its identity is stable.
+const subscribeDesktop = (onChange: () => void) => {
+  const mql = window.matchMedia(DESKTOP_QUERY);
+  mql.addEventListener("change", onChange);
+  return () => mql.removeEventListener("change", onChange);
+};
+// Client value: are we on a desktop-width screen?
+const getDesktopSnapshot = (): boolean | null => window.matchMedia(DESKTOP_QUERY).matches;
+// Server + first hydration paint: we do NOT know yet -> null. That makes the
+// server output and the first client output identical (paper only), so no wrong
+// layout ever mounts and there is no hydration mismatch. React switches to the
+// real value straight after hydration.
+const getDesktopServerSnapshot = (): boolean | null => null;
+
+/** true on desktop, false on phones, null until the browser has told us. */
+function useIsDesktop(): boolean | null {
+  return useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, getDesktopServerSnapshot);
+}
 
 // ---- Home ---------------------------------------------------------------------
-// One <Canvas> owns the whole board, and ALL of the zoom state lives right here.
-// There is no context, no store and no module-level variable anywhere else in
-// the app (app/layout.tsx only loads the font), so this component is the one and
-// only source of truth for "which note is open".
+// The page is now a thin switch:
+//   * screen size unknown  -> the paper background only (no layout flash)
+//   * desktop              -> the 3D board (HomeBoard), loaded on demand
+//   * phone                -> the plain-HTML zigzag (MobileHome) with its CSS zoom
 //
-// WHY THIS FILE HAS TO RESET EXPLICITLY
-// -------------------------------------
+// ONLY ONE of the two layouts is mounted at a time, so the 3D scene can no longer
+// steal the tap on a phone.
+//
+// WHY THIS FILE STILL RESETS THE BOARD EXPLICITLY
+// -----------------------------------------------
 // The app runs with `cacheComponents: true`, so navigating away from Home does
-// NOT unmount this component. Next.js hides the route with React's <Activity>
-// instead, and <Activity> keeps `useState` values alive. On top of that the GSAP
-// zoom had already parked the camera on the note. Coming back therefore used to
-// show a half-zoomed board. The fix is to reset on the way out AND on the way
-// back in — the effect below does both.
+// NOT unmount this component — Next.js hides the route with React's <Activity>
+// and keeps `useState` values alive. The GSAP zoom had already parked the camera
+// on a note, so coming back used to show a half-zoomed board. The effect below
+// resets on the way out AND on the way back in.
 export default function Home() {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
 
   // SINGLE SOURCE OF TRUTH for the whole section:
   //   openNote    -> which note the camera is flying to (null = the full board)
@@ -72,7 +103,7 @@ export default function Home() {
     return () => window.removeEventListener("pageshow", onPageShow);
   }, [resetBoard]);
 
-  // Clicking a note starts the zoom; nothing else happens until it lands.
+  // Clicking a note (desktop) starts the zoom; nothing else happens until it lands.
   // It also retires the "pick a note to start" hint for good.
   const handleSelect = useCallback((id: NoteId) => {
     setHintVisible(false);
@@ -84,8 +115,9 @@ export default function Home() {
   // is never restarted by a re-render.
   const handleSprayDone = useCallback(() => setSprayDone(true), []);
 
-  // Every note now leads to its own page: when the fly-in finishes we simply
-  // navigate. (There is no "Coming soon" panel any more.)
+  // Desktop only: when the fly-in finishes we navigate to that note's page. (The
+  // phone layout in MobileHome.tsx does its own navigation; this never runs there
+  // because HomeBoard is not mounted.)
   const handleZoomComplete = useCallback(() => {
     const id = openNoteRef.current;
     if (id === "about") router.push("/about");
@@ -95,29 +127,27 @@ export default function Home() {
   }, [router]);
 
   return (
-    <main className="relative h-dvh w-screen overflow-hidden bg-background">
-      {/* One Canvas for the whole home section. `flat` keeps colours un-tonemapped.
-          `frameloop="demand"` only draws a frame when something asks for one
-          (GSAP tweens, the ink trail, pointer moves, a resize), which keeps the
-          board idle-quiet. dpr is capped at 1.5 so retina phones stay cheap. */}
-      <Canvas flat camera={{ position: [0, 0, 8], fov: 45 }} dpr={[1, 1.5]} frameloop="demand">
-        {/* Suspense covers the texture / font loading that happens inside the scene. */}
-        <Suspense fallback={null}>
-          <Scene
-            openNote={openNote}
-            onSelectNote={handleSelect}
-            onZoomComplete={handleZoomComplete}
-            wiggle={sprayDone}
-          />
-        </Suspense>
-      </Canvas>
-
-      {/* Spray-painted headline + the hand-written hint. Plain HTML, so it can use
-          a real CSS clamp and keeps the Sancreek font from the stylesheet. */}
-      <WelcomeHeadline hintVisible={hintVisible} onSprayDone={handleSprayDone} />
-
-      {/* Screen-space strips. They dim as soon as a note starts zooming in. */}
-      <HeaderFooter dimmed={openNote !== null} />
+    <main className="relative min-h-dvh w-full overflow-x-hidden bg-background md:h-dvh md:overflow-hidden">
+      {isDesktop === null ? (
+        // Screen size not known yet (server render + the first client paint). Show
+        // only the paper so neither layout mounts for a moment by mistake.
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0 bg-[#f5f2ea] bg-cover bg-center"
+          style={{ backgroundImage: "url('/images/paper_bg.webp')" }}
+        />
+      ) : isDesktop ? (
+        <HomeBoard
+          openNote={openNote}
+          onSelectNote={handleSelect}
+          onZoomComplete={handleZoomComplete}
+          hintVisible={hintVisible}
+          onSprayDone={handleSprayDone}
+          wiggle={sprayDone}
+        />
+      ) : (
+        <MobileHome hintVisible={hintVisible} onSprayDone={handleSprayDone} />
+      )}
     </main>
   );
 }
